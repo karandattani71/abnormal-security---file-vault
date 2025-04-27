@@ -5,4 +5,8 @@ export interface File {
   size: number;
   uploaded_at: string;
   file: string;
-} 
+  file_hash: string;
+  reference_count: number;
+  saved_space: number;
+  message?: string;
+}

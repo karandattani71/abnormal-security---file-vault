@@ -1,37 +1,70 @@
-import React from 'react';
-import { fileService } from '../services/fileService';
-import { File as FileType } from '../types/file';
-import { DocumentIcon, TrashIcon, ArrowDownTrayIcon } from '@heroicons/react/24/outline';
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import React, { useState, useEffect } from "react";
+import { fileService } from "../services/fileService";
+import { File as FileType } from "../types/file";
+import {
+  DocumentIcon,
+  TrashIcon,
+  ArrowDownTrayIcon,
+} from "@heroicons/react/24/outline";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 
 export const FileList: React.FC = () => {
   const queryClient = useQueryClient();
+  const [totalSavings, setTotalSavings] = useState<{
+    total_bytes: number;
+    total_kb: number;
+    total_mb: number;
+  } | null>(null);
 
   // Query for fetching files
-  const { data: files, isLoading, error } = useQuery({
-    queryKey: ['files'],
+  const {
+    data: files,
+    isLoading,
+    error,
+  } = useQuery({
+    queryKey: ["files"],
     queryFn: fileService.getFiles,
   });
+
+  // Query for fetching storage savings
+  const { data: savingsData } = useQuery({
+    queryKey: ["savings"],
+    queryFn: fileService.getStorageSavings,
+  });
+
+  useEffect(() => {
+    if (savingsData) {
+      setTotalSavings(savingsData);
+    }
+  }, [savingsData]);
 
   // Mutation for deleting files
   const deleteMutation = useMutation({
     mutationFn: fileService.deleteFile,
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['files'] });
+      // Invalidate all relevant queries
+      queryClient.invalidateQueries({ queryKey: ["files"] });
+      queryClient.invalidateQueries({ queryKey: ["savings"] });
+      queryClient.invalidateQueries({ queryKey: ["fileStats"] });
     },
   });
 
   // Mutation for downloading files
   const downloadMutation = useMutation({
-    mutationFn: ({ fileUrl, filename }: { fileUrl: string; filename: string }) =>
-      fileService.downloadFile(fileUrl, filename),
+    mutationFn: ({
+      fileUrl,
+      filename,
+    }: {
+      fileUrl: string;
+      filename: string;
+    }) => fileService.downloadFile(fileUrl, filename),
   });
 
   const handleDelete = async (id: string) => {
     try {
       await deleteMutation.mutateAsync(id);
     } catch (err) {
-      console.error('Delete error:', err);
+      console.error("Delete error:", err);
     }
   };
 
@@ -39,7 +72,7 @@ export const FileList: React.FC = () => {
     try {
       await downloadMutation.mutateAsync({ fileUrl, filename });
     } catch (err) {
-      console.error('Download error:', err);
+      console.error("Download error:", err);
     }
   };
 
@@ -77,7 +110,9 @@ export const FileList: React.FC = () => {
               </svg>
             </div>
             <div className="ml-3">
-              <p className="text-sm text-red-700">Failed to load files. Please try again.</p>
+              <p className="text-sm text-red-700">
+                Failed to load files. Please try again.
+              </p>
             </div>
           </div>
         </div>
@@ -87,7 +122,17 @@ export const FileList: React.FC = () => {
 
   return (
     <div className="p-6">
-      <h2 className="text-xl font-semibold text-gray-900 mb-4">Uploaded Files</h2>
+      <div className="flex justify-between items-center mb-4">
+        <h2 className="text-xl font-semibold text-gray-900">Uploaded Files</h2>
+        {totalSavings && totalSavings.total_bytes > 0 && (
+          <div className="text-sm bg-green-50 text-green-700 px-4 py-2 rounded-lg">
+            <span className="font-medium">Storage Saved:</span>{" "}
+            {totalSavings.total_mb >= 1
+              ? `${totalSavings.total_mb.toFixed(2)} MB`
+              : `${totalSavings.total_kb.toFixed(2)} KB`}
+          </div>
+        )}
+      </div>
       {!files || files.length === 0 ? (
         <div className="text-center py-12">
           <DocumentIcon className="mx-auto h-12 w-12 text-gray-400" />
@@ -108,6 +153,11 @@ export const FileList: React.FC = () => {
                   <div className="flex-1 min-w-0">
                     <p className="text-sm font-medium text-gray-900 truncate">
                       {file.original_filename}
+                      {file.reference_count > 1 && (
+                        <span className="ml-2 inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
+                          {file.reference_count} uploads
+                        </span>
+                      )}
                     </p>
                     <p className="text-sm text-gray-500">
                       {file.file_type} • {(file.size / 1024).toFixed(2)} KB
@@ -115,10 +165,18 @@ export const FileList: React.FC = () => {
                     <p className="text-sm text-gray-500">
                       Uploaded {new Date(file.uploaded_at).toLocaleString()}
                     </p>
+                    {file.saved_space > 0 && (
+                      <p className="text-sm text-green-600">
+                        Saved {(file.saved_space / 1024 / 1024).toFixed(2)} MB
+                        of storage
+                      </p>
+                    )}
                   </div>
                   <div className="flex space-x-2">
                     <button
-                      onClick={() => handleDownload(file.file, file.original_filename)}
+                      onClick={() =>
+                        handleDownload(file.file, file.original_filename)
+                      }
                       disabled={downloadMutation.isPending}
                       className="inline-flex items-center px-3 py-2 border border-transparent shadow-sm text-sm leading-4 font-medium rounded-md text-white bg-primary-600 hover:bg-primary-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500"
                     >
@@ -142,4 +200,4 @@ export const FileList: React.FC = () => {
       )}
     </div>
   );
-}; 
+};

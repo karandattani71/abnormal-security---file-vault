@@ -59,7 +59,7 @@ docker-compose up --build
 
 4. **Run migrations**
    ```bash
-   python manage.py migrate
+   python manage.py makemigrations && python manage.py migrate
    ```
 
 5. **Start the development server**

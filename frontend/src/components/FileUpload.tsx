@@ -1,7 +1,8 @@
-import React, { useState } from 'react';
-import { fileService } from '../services/fileService';
-import { CloudArrowUpIcon } from '@heroicons/react/24/outline';
-import { useMutation, useQueryClient } from '@tanstack/react-query';
+import React, { useState } from "react";
+import { fileService } from "../services/fileService";
+import { CloudArrowUpIcon } from "@heroicons/react/24/outline";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { File as FileType } from "../types/file";
 
 interface FileUploadProps {
   onUploadSuccess: () => void;
@@ -10,19 +11,32 @@ interface FileUploadProps {
 export const FileUpload: React.FC<FileUploadProps> = ({ onUploadSuccess }) => {
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [successMessage, setSuccessMessage] = useState<string | null>(null);
   const queryClient = useQueryClient();
 
   const uploadMutation = useMutation({
     mutationFn: fileService.uploadFile,
-    onSuccess: () => {
+    onSuccess: (data: FileType) => {
       // Invalidate and refetch files query
-      queryClient.invalidateQueries({ queryKey: ['files'] });
+      queryClient.invalidateQueries({ queryKey: ["files"] });
+      // Also invalidate the stats query
+      queryClient.invalidateQueries({ queryKey: ["fileStats"] });
+      queryClient.invalidateQueries({ queryKey: ["savings"] });
+
       setSelectedFile(null);
+
+      // Check if file was a duplicate
+      if (data.message) {
+        setSuccessMessage(data.message);
+      } else {
+        setSuccessMessage("File uploaded successfully.");
+      }
+
       onUploadSuccess();
     },
     onError: (error) => {
-      setError('Failed to upload file. Please try again.');
-      console.error('Upload error:', error);
+      setError("Failed to upload file. Please try again.");
+      console.error("Upload error:", error);
     },
   });
 
@@ -30,17 +44,19 @@ export const FileUpload: React.FC<FileUploadProps> = ({ onUploadSuccess }) => {
     if (event.target.files && event.target.files[0]) {
       setSelectedFile(event.target.files[0]);
       setError(null);
+      setSuccessMessage(null);
     }
   };
 
   const handleUpload = async () => {
     if (!selectedFile) {
-      setError('Please select a file');
+      setError("Please select a file");
       return;
     }
 
     try {
       setError(null);
+      setSuccessMessage(null);
       await uploadMutation.mutateAsync(selectedFile);
     } catch (err) {
       // Error handling is done in onError callback
@@ -81,6 +97,11 @@ export const FileUpload: React.FC<FileUploadProps> = ({ onUploadSuccess }) => {
             Selected: {selectedFile.name}
           </div>
         )}
+        {successMessage && (
+          <div className="text-sm text-green-600 bg-green-50 p-2 rounded">
+            {successMessage}
+          </div>
+        )}
         {error && (
           <div className="text-sm text-red-600 bg-red-50 p-2 rounded">
             {error}
@@ -91,8 +112,8 @@ export const FileUpload: React.FC<FileUploadProps> = ({ onUploadSuccess }) => {
           disabled={!selectedFile || uploadMutation.isPending}
           className={`w-full flex justify-center py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white ${
             !selectedFile || uploadMutation.isPending
-              ? 'bg-gray-300 cursor-not-allowed'
-              : 'bg-primary-600 hover:bg-primary-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500'
+              ? "bg-gray-300 cursor-not-allowed"
+              : "bg-primary-600 hover:bg-primary-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500"
           }`}
         >
           {uploadMutation.isPending ? (
@@ -120,10 +141,10 @@ export const FileUpload: React.FC<FileUploadProps> = ({ onUploadSuccess }) => {
               Uploading...
             </>
           ) : (
-            'Upload'
+            "Upload"
           )}
         </button>
       </div>
     </div>
   );
-}; 
+};

@@ -15,9 +15,18 @@ class File(models.Model):
     file_type = models.CharField(max_length=100)
     size = models.BigIntegerField()
     uploaded_at = models.DateTimeField(auto_now_add=True)
+    file_hash = models.CharField(max_length=64, unique=True, db_index=True, null=True)
+    reference_count = models.IntegerField(default=1, db_index=True)
     
     class Meta:
         ordering = ['-uploaded_at']
     
     def __str__(self):
         return self.original_filename
+    
+    @property
+    def saved_space(self):
+        """Calculate storage space saved through deduplication"""
+        if self.reference_count > 1:
+            return self.size * (self.reference_count - 1)
+        return 0
