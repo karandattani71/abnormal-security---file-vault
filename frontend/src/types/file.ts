@@ -9,4 +9,12 @@ export interface File {
   reference_count: number;
   saved_space: number;
   message?: string;
+
+  // Enhanced metadata fields
+  file_extension?: string;
+  content_category?: string;
+  last_modified?: string;
+  description?: string;
+  tags?: string[];
+  is_favorite?: boolean;
 }
