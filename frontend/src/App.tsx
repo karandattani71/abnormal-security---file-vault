@@ -18,7 +18,7 @@ function App() {
             Abnormal Security - File Hub
           </h1>
           <p className="mt-1 text-sm text-gray-500">
-            File management system with deduplication
+            File management system with deduplication and advanced search
           </p>
         </div>
       </header>

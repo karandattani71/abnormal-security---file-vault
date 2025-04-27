@@ -32,6 +32,18 @@ interface FileStats {
   }>;
 }
 
+export interface FileFilters {
+  search?: string;
+  file_type?: string;
+  min_size?: number;
+  max_size?: number;
+  start_date?: string;
+  end_date?: string;
+  date_range?: string;
+  ordering?: string;
+  page?: number;
+}
+
 export const fileService = {
   async uploadFile(file: File): Promise<FileType> {
     const formData = new FormData();
@@ -45,9 +57,50 @@ export const fileService = {
     return response.data;
   },
 
-  async getFiles(): Promise<FileType[]> {
-    const response = await axios.get(`${API_URL}/files/`);
-    return response.data;
+  async getFiles(filters: FileFilters = {}): Promise<FileType[]> {
+    // Build query params from filters
+    const params = new URLSearchParams();
+
+    if (filters.search) {
+      params.append("search", filters.search);
+    }
+
+    if (filters.file_type) {
+      params.append("file_type", filters.file_type);
+    }
+
+    if (filters.min_size) {
+      params.append("min_size", filters.min_size.toString());
+    }
+
+    if (filters.max_size) {
+      params.append("max_size", filters.max_size.toString());
+    }
+
+    if (filters.start_date) {
+      params.append("start_date", filters.start_date);
+    }
+
+    if (filters.end_date) {
+      params.append("end_date", filters.end_date);
+    }
+
+    if (filters.date_range) {
+      params.append("date_range", filters.date_range);
+    }
+
+    if (filters.ordering) {
+      params.append("ordering", filters.ordering);
+    }
+
+    if (filters.page) {
+      params.append("page", filters.page.toString());
+    }
+
+    const response = await axios.get(`${API_URL}/files/`, { params });
+
+    // Handle pagination
+    return response.data.results || response.data;
   },
 
   async deleteFile(id: string): Promise<void> {
@@ -83,6 +136,11 @@ export const fileService = {
 
   async getFileStats(): Promise<FileStats> {
     const response = await axios.get(`${API_URL}/files/stats/`);
+    return response.data;
+  },
+
+  async getFileTypes(): Promise<string[]> {
+    const response = await axios.get(`${API_URL}/files/file_types/`);
     return response.data;
   },
 };

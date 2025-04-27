@@ -6,12 +6,74 @@ from .models import File
 from .serializers import FileSerializer
 import hashlib
 from django.db.models import Sum, F, Count
+from rest_framework import filters
+import datetime
+from django.utils.dateparse import parse_date
 
 # Create your views here.
 
 class FileViewSet(viewsets.ModelViewSet):
     queryset = File.objects.all()
     serializer_class = FileSerializer
+    filter_backends = [filters.SearchFilter, filters.OrderingFilter]
+    search_fields = ['original_filename', 'file_type']
+    ordering_fields = ['original_filename', 'size', 'uploaded_at', 'reference_count']
+    ordering = ['-uploaded_at']
+
+    def get_queryset(self):
+        """
+        Override get_queryset to apply custom filtering based on query parameters.
+        """
+        queryset = super().get_queryset()
+        
+        # Get query parameters
+        params = self.request.query_params
+        
+        # File type filter
+        file_type = params.get('file_type')
+        if file_type:
+            queryset = queryset.filter(file_type__icontains=file_type)
+        
+        # Size range filters
+        min_size = params.get('min_size')
+        max_size = params.get('max_size')
+        if min_size and min_size.isdigit():
+            queryset = queryset.filter(size__gte=int(min_size))
+        if max_size and max_size.isdigit():
+            queryset = queryset.filter(size__lte=int(max_size))
+        
+        # Date range filters
+        start_date = params.get('start_date')
+        end_date = params.get('end_date')
+        if start_date:
+            start = parse_date(start_date)
+            if start:
+                queryset = queryset.filter(uploaded_at__date__gte=start)
+        if end_date:
+            end = parse_date(end_date)
+            if end:
+                queryset = queryset.filter(uploaded_at__date__lte=end)
+        
+        # Date range shortcuts
+        date_range = params.get('date_range')
+        if date_range:
+            today = datetime.date.today()
+            if date_range == 'today':
+                queryset = queryset.filter(uploaded_at__date=today)
+            elif date_range == 'yesterday':
+                queryset = queryset.filter(uploaded_at__date=today-datetime.timedelta(days=1))
+            elif date_range == 'this_week':
+                start_of_week = today - datetime.timedelta(days=today.weekday())
+                queryset = queryset.filter(uploaded_at__date__gte=start_of_week)
+            elif date_range == 'this_month':
+                queryset = queryset.filter(
+                    uploaded_at__date__year=today.year,
+                    uploaded_at__date__month=today.month
+                )
+            elif date_range == 'this_year':
+                queryset = queryset.filter(uploaded_at__date__year=today.year)
+        
+        return queryset
 
     def create(self, request, *args, **kwargs):
         file_obj = request.FILES.get('file')
@@ -132,6 +194,12 @@ class FileViewSet(viewsets.ModelViewSet):
             },
             'file_types': file_types
         })
+    
+    @action(detail=False, methods=['get'])
+    def file_types(self, request):
+        """Endpoint to get list of unique file types in the system"""
+        types = File.objects.values_list('file_type', flat=True).distinct()
+        return Response(list(types))
     
     def _compute_file_hash(self, file_obj):
         """Compute SHA-256 hash of file contents"""

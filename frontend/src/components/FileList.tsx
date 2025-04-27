@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import { fileService } from "../services/fileService";
+import { fileService, FileFilters } from "../services/fileService";
 import { File as FileType } from "../types/file";
 import {
   DocumentIcon,
@@ -7,23 +7,25 @@ import {
   ArrowDownTrayIcon,
 } from "@heroicons/react/24/outline";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { SearchFilterBar } from "./SearchFilterBar";
 
 export const FileList: React.FC = () => {
   const queryClient = useQueryClient();
+  const [filters, setFilters] = useState<FileFilters>({});
   const [totalSavings, setTotalSavings] = useState<{
     total_bytes: number;
     total_kb: number;
     total_mb: number;
   } | null>(null);
 
-  // Query for fetching files
+  // Query for fetching files with filters
   const {
     data: files,
     isLoading,
     error,
   } = useQuery({
-    queryKey: ["files"],
-    queryFn: fileService.getFiles,
+    queryKey: ["files", filters],
+    queryFn: () => fileService.getFiles(filters),
   });
 
   // Query for fetching storage savings
@@ -46,6 +48,7 @@ export const FileList: React.FC = () => {
       queryClient.invalidateQueries({ queryKey: ["files"] });
       queryClient.invalidateQueries({ queryKey: ["savings"] });
       queryClient.invalidateQueries({ queryKey: ["fileStats"] });
+      queryClient.invalidateQueries({ queryKey: ["fileTypes"] });
     },
   });
 
@@ -76,9 +79,14 @@ export const FileList: React.FC = () => {
     }
   };
 
+  const handleFilterChange = (newFilters: FileFilters) => {
+    setFilters(newFilters);
+  };
+
   if (isLoading) {
     return (
       <div className="p-6">
+        <SearchFilterBar onFilterChange={handleFilterChange} />
         <div className="animate-pulse space-y-4">
           <div className="h-4 bg-gray-200 rounded w-1/4"></div>
           <div className="space-y-3">
@@ -94,6 +102,7 @@ export const FileList: React.FC = () => {
   if (error) {
     return (
       <div className="p-6">
+        <SearchFilterBar onFilterChange={handleFilterChange} />
         <div className="bg-red-50 border-l-4 border-red-400 p-4">
           <div className="flex">
             <div className="flex-shrink-0">
@@ -122,6 +131,8 @@ export const FileList: React.FC = () => {
 
   return (
     <div className="p-6">
+      <SearchFilterBar onFilterChange={handleFilterChange} />
+
       <div className="flex justify-between items-center mb-4">
         <h2 className="text-xl font-semibold text-gray-900">Uploaded Files</h2>
         {totalSavings && totalSavings.total_bytes > 0 && (
@@ -138,7 +149,9 @@ export const FileList: React.FC = () => {
           <DocumentIcon className="mx-auto h-12 w-12 text-gray-400" />
           <h3 className="mt-2 text-sm font-medium text-gray-900">No files</h3>
           <p className="mt-1 text-sm text-gray-500">
-            Get started by uploading a file
+            {Object.keys(filters).length > 0
+              ? "No files match your search criteria. Try adjusting your filters."
+              : "Get started by uploading a file"}
           </p>
         </div>
       ) : (
